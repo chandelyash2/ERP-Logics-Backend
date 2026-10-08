@@ -1,0 +1,470 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  BUSINESS_OWNER
+  STAFF
+  ACCOUNTANT
+}
+
+model Company {
+  id              String            @id @default(uuid())
+  name            String            // e.g. "PharmaVanguard Wholesale Agency"
+  legalName       String?
+  gstin           String?           // e.g. "27AAACC1206D1ZG"
+  dlNumber        String?           // Drug License No.
+  phone           String?
+  email           String?
+  address         String?
+  city            String?           @default("Mumbai")
+  state           String            @default("Maharashtra")
+  stateCode       String            @default("27")
+  pincode         String?
+  invoicePrefix   String            @default("INV-2026-")
+  purchasePrefix  String            @default("PUR-2026-")
+  plan            String            @default("GROWTH") // "STARTER" | "GROWTH" | "ENTERPRISE"
+  isActive        Boolean           @default(true)
+  
+  users           User[]
+  medicines       Medicine[]
+  batches         MedicineBatch[]
+  customers       Customer[]
+  suppliers       Supplier[]
+  purchaseInvoices PurchaseInvoice[]
+  salesInvoices   SalesInvoice[]
+  salesReturns    SalesReturn[]
+  purchaseReturns PurchaseReturn[]
+  payments        Payment[]
+  expenses        Expense[]
+  stockLedgers    StockLedger[]
+  customerLedgers CustomerLedger[]
+  supplierLedgers SupplierLedger[]
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model User {
+  id            String    @id @default(uuid())
+  companyId     String?
+  company       Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  email         String    @unique
+  name          String
+  passwordHash  String?
+  role          Role      @default(STAFF)
+  authProvider  String    @default("LOCAL") // "LOCAL" | "GOOGLE"
+  
+  // Granular Permissions
+  canCreateInvoices    Boolean @default(true)
+  canViewInventory     Boolean @default(true)
+  canAddCustomers      Boolean @default(true)
+  canAddSuppliers      Boolean @default(false)
+  canRecordPayments    Boolean @default(false)
+  canViewReports       Boolean @default(false)
+  canEditDeleteRecords Boolean @default(false)
+  canManageSettings    Boolean @default(false)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId])
+}
+
+model Medicine {
+  id              String          @id @default(uuid())
+  companyId       String
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  name            String
+  genericName     String?
+  brand           String?
+  category        String?
+  hsnCode         String          @default("30049060")
+  gstRate         Float           @default(12.0)
+  unit            String          @default("Box")
+  packSize        String          @default("10x10")
+  rackLocation    String?
+  minStockAlert   Int             @default(10)
+  purchaseRate    Float           @default(0.0)
+  saleRate        Float           @default(0.0)
+  wholesaleRate   Float           @default(0.0)
+  mrp             Float           @default(0.0)
+  discountPercent Float           @default(0.0)
+  
+  batches         MedicineBatch[]
+  stockLedgers    StockLedger[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([companyId])
+}
+
+model MedicineBatch {
+  id              String          @id @default(uuid())
+  companyId       String
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  medicineId      String
+  medicine        Medicine        @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  
+  medicineName    String
+  genericName     String?
+  hsnCode         String          @default("30049060")
+  batchNumber     String
+  mfgDate         String?         // YYYY-MM
+  expiryDate      String          // YYYY-MM-DD or YYYY-MM
+  purchaseRate    Float           @default(0.0)
+  mrp             Float           @default(0.0)
+  saleRate        Float           @default(0.0)
+  gstRate         Float           @default(12.0)
+  quantity        Float           @default(0.0)
+  freeQuantity    Float           @default(0.0)
+  supplierId      String?
+  supplierName    String?
+  
+  stockLedgers    StockLedger[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([companyId])
+  @@index([medicineId])
+  @@index([expiryDate])
+}
+
+model Customer {
+  id              String          @id @default(uuid())
+  companyId       String
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  customerIdCode  String          // CUST-0001
+  name            String
+  businessName    String?
+  phone           String?
+  email           String?
+  address         String?
+  city            String?
+  district        String?
+  state           String          @default("Maharashtra")
+  stateCode       String          @default("27")
+  pincode         String?
+  gstin           String?
+  dlNumber        String?
+  creditLimit     Float           @default(100000.0)
+  openingBalance  Float           @default(0.0)
+  currentBalance  Float           @default(0.0)
+  paymentTerms    String?         @default("30 Days")
+  status          String          @default("active")
+  isInterstate    Boolean         @default(false)
+  saleNature      String          @default("intrastate")
+
+  salesInvoices   SalesInvoice[]
+  salesReturns    SalesReturn[]
+  customerLedgers CustomerLedger[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([companyId])
+  @@index([name])
+}
+
+model Supplier {
+  id              String          @id @default(uuid())
+  companyId       String
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  supplierIdCode  String          // SUP-0001
+  name            String
+  companyName     String?
+  phone           String?
+  email           String?
+  address         String?
+  city            String?
+  district        String?
+  state           String          @default("Maharashtra")
+  stateCode       String          @default("27")
+  pincode         String?
+  gstin           String?
+  dlNumber        String?
+  openingBalance  Float           @default(0.0)
+  currentBalance  Float           @default(0.0)
+  paymentTerms    String?         @default("Net 30")
+  isInterstate    Boolean         @default(false)
+  saleNature      String          @default("intrastate")
+
+  purchaseInvoices PurchaseInvoice[]
+  purchaseReturns  PurchaseReturn[]
+  supplierLedgers  SupplierLedger[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([companyId])
+  @@index([name])
+}
+
+model PurchaseInvoice {
+  id                String    @id @default(uuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  invoiceNumber     String    // PUR-2026-00001
+  supplierInvoiceNo String?
+  supplierId        String
+  supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierName      String
+  supplierGstin     String?
+  supplierState     String    @default("Maharashtra")
+  supplierStateCode String    @default("27")
+  invoiceDate       String
+  paymentType       String    @default("Credit")
+  isInterstate      Boolean   @default(false)
+  items             Json      // Calculated item breakdown
+  subtotal          Float     @default(0.0)
+  taxableValue      Float     @default(0.0)
+  cgstTotal         Float     @default(0.0)
+  sgstTotal         Float     @default(0.0)
+  igstTotal         Float     @default(0.0)
+  gstSummary        Json      // Array of multi-rate GST breakdown
+  roundOff          Float     @default(0.0)
+  grandTotal        Float     @default(0.0)
+  amountInWords     String?
+  totalPurchaseCost Float     @default(0.0)
+  amountPaid        Float     @default(0.0)
+  balanceDue        Float     @default(0.0)
+  paymentStatus     String    @default("Unpaid") // Paid, Partial, Unpaid
+  notes             String?
+  createdBy         String    @default("Staff")
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([supplierId])
+}
+
+model SalesInvoice {
+  id                   String    @id @default(uuid())
+  companyId            String
+  company              Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  invoiceNumber        String    // INV-2026-00001
+  customerId           String
+  customer             Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerName         String
+  customerBusinessName String?
+  customerPhone        String?
+  customerGstin        String?
+  customerDl           String?
+  customerAddress      String?
+  customerState        String    @default("Maharashtra")
+  customerStateCode    String    @default("27")
+  invoiceDate          String
+  dueDate              String
+  paymentType          String    @default("Credit")
+  isInterstate         Boolean   @default(false)
+  items                Json      // Calculated item breakdown
+  subtotal             Float     @default(0.0)
+  invoiceDiscountPercent Float   @default(0.0)
+  invoiceDiscountAmount  Float   @default(0.0)
+  taxableValue         Float     @default(0.0)
+  cgstTotal            Float     @default(0.0)
+  sgstTotal            Float     @default(0.0)
+  igstTotal            Float     @default(0.0)
+  gstSummary           Json      // Array of multi-rate GST breakdown
+  roundOff             Float     @default(0.0)
+  grandTotal           Float     @default(0.0)
+  amountInWords        String?
+  totalPurchaseCost    Float     @default(0.0)
+  grossProfit          Float     @default(0.0)
+  amountPaid           Float     @default(0.0)
+  balanceDue           Float     @default(0.0)
+  paymentStatus        String    @default("Unpaid") // Paid, Partial, Unpaid
+  notes                String?
+  createdBy            String    @default("Staff")
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([customerId])
+}
+
+model SalesReturn {
+  id                String    @id @default(uuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  returnNumber      String    // RET-S-2026-00001
+  returnDate        String
+  originalInvoiceNo String?
+  customerId        String
+  customer          Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerName      String
+  items             Json
+  returnSubtotal    Float     @default(0.0)
+  returnTaxAmount   Float     @default(0.0)
+  returnTotal       Float     @default(0.0)
+  refundMode        String    @default("Credit Note (Adjust in Ledger)")
+  ledgerAction      String    @default("Credit Note (Deduct from Customer Balance)")
+  reason            String?
+  notes             String?
+  createdBy         String    @default("Staff")
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([customerId])
+}
+
+model PurchaseReturn {
+  id                String    @id @default(uuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  returnNumber      String    // RET-P-2026-00001
+  returnDate        String
+  originalInvoiceNo String?
+  supplierId        String
+  supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierName      String
+  items             Json
+  returnSubtotal    Float     @default(0.0)
+  returnTaxAmount   Float     @default(0.0)
+  returnTotal       Float     @default(0.0)
+  refundMode        String    @default("Debit Note (Adjust in Ledger)")
+  ledgerAction      String    @default("Debit Note (Deduct from Supplier Balance)")
+  reason            String?
+  notes             String?
+  createdBy         String    @default("Staff")
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([supplierId])
+}
+
+model Payment {
+  id                String    @id @default(uuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  paymentNumber     String    // PAY-2026-00001
+  partyType         String    // "Customer" | "Supplier"
+  partyId           String
+  partyName         String
+  partyBusinessName String?
+  paymentDate       String
+  amount            Float     @default(0.0)
+  paymentMethod     String    @default("Bank Transfer") // Bank Transfer, UPI, Cash, Cheque
+  referenceNumber   String?
+  notes             String?
+  createdBy         String    @default("Staff")
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([partyId])
+}
+
+model Expense {
+  id            String    @id @default(uuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  expenseDate   String
+  category      String
+  description   String
+  amount        Float     @default(0.0)
+  paymentMethod String    @default("Cash")
+  notes         String?
+  createdBy     String    @default("Staff")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId])
+}
+
+model StockLedger {
+  id                 String         @id @default(uuid())
+  companyId          String
+  company            Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  date               String
+  movementType       String         // Opening Stock, Purchase Inward, Sales Dispatch, Sales Return, Purchase Return, Stock Adjustment
+  referenceId        String?
+  referenceInvoiceNo String?
+  medicineId         String
+  medicine           Medicine       @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  medicineName       String
+  batchId            String?
+  batch              MedicineBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  batchNumber        String
+  qtyIn              Float          @default(0.0)
+  qtyOut             Float          @default(0.0)
+  balanceAfter       Float          @default(0.0)
+  notes              String?
+
+  createdAt          DateTime       @default(now())
+
+  @@index([companyId])
+  @@index([medicineId])
+  @@index([batchId])
+}
+
+model CustomerLedger {
+  id           String    @id @default(uuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerName String
+  date         String
+  entryType    String    // Invoice, Payment, Sales Return, Opening Balance, Adjustment
+  referenceNo  String?
+  debit        Float     @default(0.0)
+  credit       Float     @default(0.0)
+  balance      Float     @default(0.0)
+  description  String?
+
+  createdAt    DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([customerId])
+}
+
+model SupplierLedger {
+  id           String    @id @default(uuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  supplierId   String
+  supplier     Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierName String
+  date         String
+  entryType    String    // Purchase, Payment, Purchase Return, Opening Balance, Adjustment
+  referenceNo  String?
+  debit        Float     @default(0.0)
+  credit       Float     @default(0.0)
+  balance      Float     @default(0.0)
+  description  String?
+
+  createdAt    DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([supplierId])
+}
